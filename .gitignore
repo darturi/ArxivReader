@@ -48,3 +48,5 @@ ios/ArxivReader.xcodeproj/xcuserdata/
 ios/ArxivReader.xcodeproj/project.xcworkspace/xcuserdata/
 *.xcuserstate
 DerivedData/
+Secrets.plist
+!Secrets.plist.example
