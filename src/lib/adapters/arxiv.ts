@@ -3,20 +3,10 @@ import { PaperResult, PaperSourceAdapter } from "@/lib/types";
 
 const ARXIV_API_BASE = "http://export.arxiv.org/api/query";
 const USER_AGENT = "ArXivReader/1.0 (mailto:dan.arturi@gmail.com)";
-const MIN_REQUEST_INTERVAL_MS = 3000;
 
-let lastRequestTime = 0;
-
-async function throttle(): Promise<void> {
-  const now = Date.now();
-  const elapsed = now - lastRequestTime;
-  if (elapsed < MIN_REQUEST_INTERVAL_MS) {
-    await new Promise((resolve) =>
-      setTimeout(resolve, MIN_REQUEST_INTERVAL_MS - elapsed)
-    );
-  }
-  lastRequestTime = Date.now();
-}
+// No per-request throttle — server-side rate limiting (20 searches/hr/user)
+// already prevents abuse, and on serverless each invocation is isolated
+// so an in-memory throttle doesn't work anyway.
 
 function parseArxivId(entry: Record<string, unknown>): string {
   const id = String(entry.id || "");
@@ -72,7 +62,6 @@ export class ArxivAdapter implements PaperSourceAdapter {
   }
 
   async search(query: string, maxResults = 20): Promise<PaperResult[]> {
-    await throttle();
 
     const params = new URLSearchParams({
       search_query: `all:${query}`,
@@ -101,7 +90,6 @@ export class ArxivAdapter implements PaperSourceAdapter {
   }
 
   async searchByAuthor(authorName: string, maxResults = 40): Promise<PaperResult[]> {
-    await throttle();
 
     const params = new URLSearchParams({
       search_query: `au:"${authorName}"`,
@@ -130,7 +118,6 @@ export class ArxivAdapter implements PaperSourceAdapter {
   }
 
   async fetchByIdentifier(id: string): Promise<PaperResult | null> {
-    await throttle();
 
     const response = await fetch(
       `${ARXIV_API_BASE}?id_list=${encodeURIComponent(id)}`,
