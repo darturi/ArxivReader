@@ -132,7 +132,8 @@ struct SearchResultCard: View {
     }
 
     private func addToList(_ list: ReadingList, readDate: Date?) async {
-        guard let userId = authService.userId else { return }
+        guard let userId = authService.userId,
+              let token = await authService.getAccessToken() else { return }
         isAdding = true
 
         let dateString: String? = readDate.map { date in
@@ -146,7 +147,8 @@ struct SearchResultCard: View {
                 userId: userId,
                 arxivId: paper.arxivId,
                 list: list,
-                readAt: dateString
+                readAt: dateString,
+                accessToken: token
             )
             userList = list.rawValue
             showDatePicker = false

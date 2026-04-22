@@ -8,6 +8,12 @@ struct PaperDetailView: View {
     var onUpdate: ((UserPaper) -> Void)?
     var onDelete: (() -> Void)?
 
+    init(paper: UserPaper, onUpdate: ((UserPaper) -> Void)? = nil, onDelete: (() -> Void)? = nil) {
+        self._paper = State(initialValue: paper)
+        self.onUpdate = onUpdate
+        self.onDelete = onDelete
+    }
+
     @State private var notes: String = ""
     @State private var saveStatus: SaveStatus = .idle
     @State private var allTags: [Tag] = []
@@ -258,8 +264,9 @@ struct PaperDetailView: View {
     }
 
     private func addTag(_ tag: Tag) async {
+        guard let token = await authService.getAccessToken() else { return }
         do {
-            try await SupabaseService.shared.addTagToPaper(userPaperId: paper.id, tagId: tag.id)
+            try await SupabaseService.shared.addTagToPaper(userPaperId: paper.id, tagId: tag.id, accessToken: token)
             paper.tags.append(tag)
             onUpdate?(paper)
         } catch {
@@ -268,8 +275,9 @@ struct PaperDetailView: View {
     }
 
     private func removeTag(_ tag: Tag) async {
+        guard let token = await authService.getAccessToken() else { return }
         do {
-            try await SupabaseService.shared.removeTagFromPaper(userPaperId: paper.id, tagId: tag.id)
+            try await SupabaseService.shared.removeTagFromPaper(userPaperId: paper.id, tagId: tag.id, accessToken: token)
             paper.tags.removeAll { $0.id == tag.id }
             onUpdate?(paper)
         } catch {
@@ -278,13 +286,13 @@ struct PaperDetailView: View {
     }
 
     private func createAndAddTag() async {
-        guard let userId = authService.userId else { return }
+        guard let token = await authService.getAccessToken() else { return }
         let name = newTagName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
 
         do {
-            let tag = try await SupabaseService.shared.createTag(userId: userId, name: name)
-            try await SupabaseService.shared.addTagToPaper(userPaperId: paper.id, tagId: tag.id)
+            let tag = try await SupabaseService.shared.createTag(name: name, accessToken: token)
+            try await SupabaseService.shared.addTagToPaper(userPaperId: paper.id, tagId: tag.id, accessToken: token)
             paper.tags.append(tag)
             allTags.append(tag)
             newTagName = ""
@@ -309,12 +317,12 @@ struct PaperDetailView: View {
     }
 
     private func saveNotesToServer() async {
-        guard let userId = authService.userId else { return }
+        guard let token = await authService.getAccessToken() else { return }
         do {
             try await SupabaseService.shared.updateUserPaper(
-                userId: userId,
                 paperId: paper.id,
-                updates: ["notes": .string(notes)]
+                updates: ["notes": notes],
+                accessToken: token
             )
             paper.notes = notes
             saveStatus = .saved
@@ -328,21 +336,16 @@ struct PaperDetailView: View {
     // MARK: - Read date
 
     private func saveReadDate(_ date: String?) async {
-        guard let userId = authService.userId else { return }
+        guard let token = await authService.getAccessToken() else { return }
         do {
-            if let date {
-                try await SupabaseService.shared.updateUserPaper(
-                    userId: userId,
-                    paperId: paper.id,
-                    updates: ["read_at": .string(date)]
-                )
-            } else {
-                try await SupabaseService.shared.updateUserPaper(
-                    userId: userId,
-                    paperId: paper.id,
-                    updates: ["read_at": .null]
-                )
-            }
+            let updates: [String: Any] = date != nil
+                ? ["read_at": date!]
+                : ["read_at": NSNull()]
+            try await SupabaseService.shared.updateUserPaper(
+                paperId: paper.id,
+                updates: updates,
+                accessToken: token
+            )
             paper.readAt = date
             onUpdate?(paper)
         } catch {
@@ -353,13 +356,13 @@ struct PaperDetailView: View {
     // MARK: - Move / Delete
 
     private func movePaper() async {
-        guard let userId = authService.userId else { return }
+        guard let token = await authService.getAccessToken() else { return }
         let newList: ReadingList = paper.list == .read ? .toRead : .read
         do {
             try await SupabaseService.shared.updateUserPaper(
-                userId: userId,
                 paperId: paper.id,
-                updates: ["list": .string(newList.rawValue)]
+                updates: ["list": newList.rawValue],
+                accessToken: token
             )
             paper.list = newList
             onUpdate?(paper)
@@ -370,9 +373,9 @@ struct PaperDetailView: View {
     }
 
     private func deletePaper() async {
-        guard let userId = authService.userId else { return }
+        guard let token = await authService.getAccessToken() else { return }
         do {
-            try await SupabaseService.shared.deleteUserPaper(userId: userId, paperId: paper.id)
+            try await SupabaseService.shared.deleteUserPaper(paperId: paper.id, accessToken: token)
             onDelete?()
             dismiss()
         } catch {

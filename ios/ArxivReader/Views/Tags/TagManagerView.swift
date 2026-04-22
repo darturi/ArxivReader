@@ -91,11 +91,12 @@ struct TagManagerView: View {
 
     private func createTag() {
         let name = newTagName.trimmingCharacters(in: .whitespaces)
-        guard !name.isEmpty, let userId = authService.userId else { return }
+        guard !name.isEmpty else { return }
 
         Task {
+            guard let token = await authService.getAccessToken() else { return }
             do {
-                let tag = try await SupabaseService.shared.createTag(userId: userId, name: name)
+                let tag = try await SupabaseService.shared.createTag(name: name, accessToken: token)
                 tags.append(tag)
                 tags.sort { $0.name < $1.name }
                 newTagName = ""
@@ -106,9 +107,9 @@ struct TagManagerView: View {
     }
 
     private func deleteTag(_ tag: Tag) async {
-        guard let userId = authService.userId else { return }
+        guard let token = await authService.getAccessToken() else { return }
         do {
-            try await SupabaseService.shared.deleteTag(userId: userId, tagId: tag.id)
+            try await SupabaseService.shared.deleteTag(tagId: tag.id, accessToken: token)
             tags.removeAll { $0.id == tag.id }
         } catch {
             print("Failed to delete tag: \(error)")

@@ -1,8 +1,9 @@
 import Foundation
 import Supabase
+import SwiftUI
+import Combine
 import AuthenticationServices
 
-@MainActor
 class AuthService: ObservableObject {
     @Published var isAuthenticated = false
     @Published var userId: String?
@@ -18,6 +19,7 @@ class AuthService: ObservableObject {
         }
     }
 
+    @MainActor
     func checkSession() async {
         do {
             let session = try await supabase.auth.session
@@ -29,46 +31,53 @@ class AuthService: ObservableObject {
         isLoading = false
     }
 
+    @MainActor
     func signInWithGoogle() async throws {
+        // Use PKCE flow for mobile — Supabase returns a code we can exchange
         let url = try await supabase.auth.getOAuthSignInURL(
             provider: .google,
             redirectTo: URL(string: "arxivreader://auth/callback")
         )
 
-        // Open in system browser for OAuth
-        await MainActor.run {
-            UIApplication.shared.open(url)
+        // Use ASWebAuthenticationSession for in-app OAuth browser
+        let callbackURL: URL = try await withCheckedThrowingContinuation { continuation in
+            let session = ASWebAuthenticationSession(
+                url: url,
+                callbackURLScheme: "arxivreader"
+            ) { callbackURL, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let callbackURL else {
+                    continuation.resume(throwing: URLError(.badURL))
+                    return
+                }
+                continuation.resume(returning: callbackURL)
+            }
+
+            session.presentationContextProvider = ASWebAuthContextProvider.shared
+            session.prefersEphemeralWebBrowserSession = false
+            session.start()
         }
+
+        // Let the Supabase SDK handle the callback URL (extracts tokens/code automatically)
+        let session = try await supabase.auth.session(from: callbackURL)
+        setUser(from: session)
     }
 
+    @MainActor
     func handleDeepLink(_ url: URL) async {
-        // Extract the access_token and refresh_token from the URL fragment
-        guard let fragment = url.fragment else { return }
-
-        var params: [String: String] = [:]
-        for pair in fragment.split(separator: "&") {
-            let kv = pair.split(separator: "=", maxSplits: 1)
-            if kv.count == 2 {
-                params[String(kv[0])] = String(kv[1]).removingPercentEncoding ?? String(kv[1])
-            }
-        }
-
-        guard let accessToken = params["access_token"],
-              let refreshToken = params["refresh_token"] else {
-            return
-        }
-
+        // Fallback for external browser redirects
         do {
-            let session = try await supabase.auth.setSession(
-                accessToken: accessToken,
-                refreshToken: refreshToken
-            )
+            let session = try await supabase.auth.session(from: url)
             setUser(from: session)
         } catch {
-            print("Auth error: \(error)")
+            print("Deep link auth error: \(error)")
         }
     }
 
+    @MainActor
     func signOut() async {
         try? await supabase.auth.signOut()
         isAuthenticated = false
@@ -83,16 +92,29 @@ class AuthService: ObservableObject {
 
     // MARK: - Private
 
+    @MainActor
     private func setUser(from session: Session) {
         isAuthenticated = true
         userId = session.user.id.uuidString
         userEmail = session.user.email
 
-        // Get avatar from user metadata (Google provides this)
         if let avatarStr = session.user.userMetadata["avatar_url"]?.stringValue,
            let url = URL(string: avatarStr) {
             userAvatarURL = url
         }
+    }
+}
+
+// Provides the window for ASWebAuthenticationSession to present from
+class ASWebAuthContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    static let shared = ASWebAuthContextProvider()
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let window = windowScene.windows.first else {
+            return ASPresentationAnchor()
+        }
+        return window
     }
 }
 

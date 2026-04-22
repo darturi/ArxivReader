@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/db/client";
+import { getAuthUser } from "@/lib/db/client";
 import { getUserTags, createTag } from "@/lib/db/queries";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
-export async function GET() {
-  const supabase = createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function GET(request: NextRequest) {
+  const { user, supabase } = await getAuthUser(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -26,10 +23,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, supabase } = await getAuthUser(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

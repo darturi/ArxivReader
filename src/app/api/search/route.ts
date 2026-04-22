@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/db/client";
+import { getAuthUser } from "@/lib/db/client";
 import { getDefaultAdapter } from "@/lib/adapters";
 import { cachePapers } from "@/lib/cache";
 import { checkRateLimit, recordAction } from "@/lib/rate-limit";
@@ -8,10 +8,7 @@ const ARXIV_ID_PATTERN = /^\d{4}\.\d{4,5}$/;
 const DOI_PATTERN = /^10\.\d{4,}/;
 
 export async function GET(request: NextRequest) {
-  const supabase = createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, supabase } = await getAuthUser(request);
 
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
