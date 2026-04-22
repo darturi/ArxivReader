@@ -30,9 +30,10 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Allow access to login page and auth callback
+  // Allow access to login page, auth callback, and API routes
+  // API routes handle their own auth (supporting both cookies and Bearer tokens)
   const path = request.nextUrl.pathname;
-  if (path === "/login" || path.startsWith("/api/auth")) {
+  if (path === "/login" || path.startsWith("/api/auth") || path.startsWith("/api/")) {
     return supabaseResponse;
   }
 
