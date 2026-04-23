@@ -48,9 +48,10 @@ export async function POST(
     await addTagToPaper(supabase, id, body.tag_id);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Add tag error:", error);
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Add tag error:", msg, error);
     return NextResponse.json(
-      { error: "Failed to add tag" },
+      { error: `Failed to add tag: ${msg}` },
       { status: 500 }
     );
   }
