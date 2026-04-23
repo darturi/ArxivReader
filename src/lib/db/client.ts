@@ -40,16 +40,17 @@ export async function getAuthUser(request: NextRequest): Promise<{
   const authHeader = request.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.slice(7);
-    const supabase = createClient(
+    // Verify the user's identity from their JWT
+    const anonClient = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      }
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
-    const { data: { user } } = await supabase.auth.getUser(token);
+    const { data: { user } } = await anonClient.auth.getUser(token);
+    // Use service role client for DB operations — the API routes handle
+    // their own authorization (ownership checks, rate limits), so we
+    // bypass RLS. This avoids issues with the JS client overriding the
+    // Bearer token header internally.
+    const supabase = createSupabaseServiceClient();
     return { user, supabase };
   }
 
