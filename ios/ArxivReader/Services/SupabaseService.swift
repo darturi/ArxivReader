@@ -65,7 +65,8 @@ class SupabaseService: ObservableObject {
     // MARK: - User Papers (reads go to Supabase, writes go through API)
 
     func getUserPapers(userId: String, list: ReadingList, limit: Int = 50, offset: Int = 0) async throws -> [UserPaper] {
-        let rows: [UserPaperRow] = try await client
+        // Single query with embedded tags — avoids separate paper_tags query
+        let rows: [UserPaperRowWithTags] = try await client
             .from("user_papers")
             .select("""
                 id,
@@ -81,6 +82,14 @@ class SupabaseService: ObservableObject {
                     abstract,
                     arxiv_url,
                     published_at
+                ),
+                paper_tags (
+                    tags (
+                        id,
+                        user_id,
+                        name,
+                        created_at
+                    )
                 )
             """)
             .eq("user_id", value: userId)
@@ -90,34 +99,9 @@ class SupabaseService: ObservableObject {
             .execute()
             .value
 
-        // Fetch tags for all papers
-        let paperIds = rows.map { $0.id }
-        guard !paperIds.isEmpty else { return [] }
-
-        let paperTags: [PaperTagRow] = try await client
-            .from("paper_tags")
-            .select("""
-                user_paper_id,
-                tags (
-                    id,
-                    user_id,
-                    name,
-                    created_at
-                )
-            """)
-            .in("user_paper_id", values: paperIds)
-            .execute()
-            .value
-
-        var tagsByPaperId: [String: [Tag]] = [:]
-        for pt in paperTags {
-            if let tag = pt.tags {
-                tagsByPaperId[pt.userPaperId, default: []].append(tag)
-            }
-        }
-
         return rows.map { row in
             let cache = row.paperCache
+            let tags = (row.paperTags ?? []).compactMap { $0.tags }
             return UserPaper(
                 id: row.id,
                 userId: row.userId,
@@ -131,13 +115,13 @@ class SupabaseService: ObservableObject {
                 abstract: cache?.abstract ?? "",
                 arxivUrl: cache?.arxivUrl ?? "",
                 publishedAt: cache?.publishedAt ?? "",
-                tags: tagsByPaperId[row.id] ?? []
+                tags: tags
             )
         }
     }
 
     func getUserPaper(userId: String, paperId: String) async throws -> UserPaper? {
-        let row: UserPaperRow? = try? await client
+        let row: UserPaperRowWithTags? = try? await client
             .from("user_papers")
             .select("""
                 id,
@@ -153,6 +137,14 @@ class SupabaseService: ObservableObject {
                     abstract,
                     arxiv_url,
                     published_at
+                ),
+                paper_tags (
+                    tags (
+                        id,
+                        user_id,
+                        name,
+                        created_at
+                    )
                 )
             """)
             .eq("id", value: paperId)
@@ -163,22 +155,7 @@ class SupabaseService: ObservableObject {
 
         guard let row else { return nil }
 
-        let paperTags: [PaperTagRow] = (try? await client
-            .from("paper_tags")
-            .select("""
-                user_paper_id,
-                tags (
-                    id,
-                    user_id,
-                    name,
-                    created_at
-                )
-            """)
-            .eq("user_paper_id", value: paperId)
-            .execute()
-            .value) ?? []
-
-        let tags = paperTags.compactMap { $0.tags }
+        let tags = (row.paperTags ?? []).compactMap { $0.tags }
         let cache = row.paperCache
 
         return UserPaper(
@@ -355,19 +332,38 @@ class SupabaseService: ObservableObject {
 
     func searchPapers(query: String, accessToken: String) async throws -> SearchResponse {
         let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-        let (data, _) = try await apiRequest(
+        let (data, response) = try await apiRequest(
             path: "/api/search?q=\(encoded)",
             accessToken: accessToken
         )
+
+        guard response.statusCode == 200 else {
+            // Try to extract error message from response
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let msg = json["error"] as? String {
+                throw APIError.searchFailed(msg)
+            }
+            throw APIError.serverError(response.statusCode)
+        }
+
         return try JSONDecoder().decode(SearchResponse.self, from: data)
     }
 
     func searchByAuthor(name: String, accessToken: String) async throws -> SearchResponse {
         let encoded = name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? name
-        let (data, _) = try await apiRequest(
+        let (data, response) = try await apiRequest(
             path: "/api/author?name=\(encoded)",
             accessToken: accessToken
         )
+
+        guard response.statusCode == 200 else {
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let msg = json["error"] as? String {
+                throw APIError.searchFailed(msg)
+            }
+            throw APIError.serverError(response.statusCode)
+        }
+
         return try JSONDecoder().decode(SearchResponse.self, from: data)
     }
 }
@@ -379,6 +375,7 @@ enum APIError: LocalizedError {
     case quotaExceeded(String)
     case unauthorized
     case serverError(Int)
+    case searchFailed(String)
 
     var errorDescription: String? {
         switch self {
@@ -390,6 +387,8 @@ enum APIError: LocalizedError {
             return "Session expired. Please sign in again."
         case .serverError(let code):
             return "Request failed (HTTP \(code))"
+        case .searchFailed(let msg):
+            return msg
         }
     }
 }

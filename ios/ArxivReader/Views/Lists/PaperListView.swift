@@ -142,6 +142,12 @@ struct PaperListView: View {
             .task {
                 await loadPapers()
             }
+            .onAppear {
+                // Reload when navigating back to this tab
+                if !papers.isEmpty {
+                    Task { await loadPapers() }
+                }
+            }
         }
     }
 

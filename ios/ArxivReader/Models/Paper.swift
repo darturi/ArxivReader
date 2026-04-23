@@ -120,6 +120,37 @@ struct PaperTagRow: Codable {
     }
 }
 
+// Nested tag join (embedded in user_papers query)
+struct EmbeddedPaperTag: Codable {
+    let tags: Tag?
+}
+
+// MARK: - User Paper Row with embedded tags
+
+struct UserPaperRowWithTags: Codable, Identifiable {
+    let id: String
+    let userId: String
+    let arxivId: String
+    let list: ReadingList
+    let addedAt: String
+    let notes: String?
+    let readAt: String?
+    let paperCache: PaperCache?
+    let paperTags: [EmbeddedPaperTag]?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case arxivId = "arxiv_id"
+        case list
+        case addedAt = "added_at"
+        case notes
+        case readAt = "read_at"
+        case paperCache = "paper_cache"
+        case paperTags = "paper_tags"
+    }
+}
+
 // MARK: - User Paper with Details (enriched, used by views)
 
 struct UserPaper: Identifiable, Hashable {
