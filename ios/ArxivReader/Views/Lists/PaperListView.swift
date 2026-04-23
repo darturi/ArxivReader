@@ -152,11 +152,17 @@ struct PaperListView: View {
     }
 
     private func loadPapers() async {
-        guard let userId = authService.userId else { return }
+        guard authService.userId != nil else { return }
         loading = papers.isEmpty
         error = nil
         do {
-            papers = try await SupabaseService.shared.getUserPapers(userId: userId, list: listType)
+            // Fetch via API (uses service role) to ensure tags are always included
+            if let token = await authService.getAccessToken() {
+                papers = try await SupabaseService.shared.getUserPapersViaAPI(
+                    list: listType,
+                    accessToken: token
+                )
+            }
         } catch {
             self.error = error.localizedDescription
         }

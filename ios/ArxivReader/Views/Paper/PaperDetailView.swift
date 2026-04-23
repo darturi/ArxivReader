@@ -18,6 +18,7 @@ struct PaperDetailView: View {
     @State private var saveStatus: SaveStatus = .idle
     @State private var allTags: [Tag] = []
     @State private var newTagName = ""
+    @State private var pendingTagToAdd: Tag?
     @State private var showDeleteConfirm = false
     @State private var showMoveConfirm = false
     @State private var readDateString: String = ""
@@ -96,7 +97,7 @@ struct PaperDetailView: View {
                             }
                         }
 
-                        // Add existing tag
+                        // Add existing tag — use Picker to avoid Menu/context menu lifecycle issues
                         let availableTags = allTags.filter { tag in
                             !paper.tags.contains { $0.id == tag.id }
                         }
@@ -104,7 +105,7 @@ struct PaperDetailView: View {
                             Menu {
                                 ForEach(availableTags) { tag in
                                     Button(tag.name) {
-                                        Task { await addTag(tag) }
+                                        pendingTagToAdd = tag
                                     }
                                 }
                             } label: {
@@ -253,6 +254,11 @@ struct PaperDetailView: View {
                 readDateString = paper.readAt ?? ""
                 await loadTags()
             }
+            .onChange(of: pendingTagToAdd) { _, tag in
+                guard let tag else { return }
+                pendingTagToAdd = nil
+                Task { await addTag(tag) }
+            }
         }
     }
 
@@ -266,8 +272,11 @@ struct PaperDetailView: View {
     private func addTag(_ tag: Tag) async {
         guard let token = await authService.getAccessToken() else { return }
         do {
-            try await SupabaseService.shared.addTagToPaper(userPaperId: paper.id, tagId: tag.id, accessToken: token)
-            paper.tags.append(tag)
+            // Server returns the definitive list of tags for this paper
+            let serverTags = try await SupabaseService.shared.addTagToPaper(
+                userPaperId: paper.id, tagId: tag.id, accessToken: token
+            )
+            paper.tags = serverTags
             onUpdate?(paper)
         } catch {
             print("Failed to add tag: \(error)")
@@ -277,8 +286,10 @@ struct PaperDetailView: View {
     private func removeTag(_ tag: Tag) async {
         guard let token = await authService.getAccessToken() else { return }
         do {
-            try await SupabaseService.shared.removeTagFromPaper(userPaperId: paper.id, tagId: tag.id, accessToken: token)
-            paper.tags.removeAll { $0.id == tag.id }
+            let serverTags = try await SupabaseService.shared.removeTagFromPaper(
+                userPaperId: paper.id, tagId: tag.id, accessToken: token
+            )
+            paper.tags = serverTags
             onUpdate?(paper)
         } catch {
             print("Failed to remove tag: \(error)")
@@ -292,8 +303,10 @@ struct PaperDetailView: View {
 
         do {
             let tag = try await SupabaseService.shared.createTag(name: name, accessToken: token)
-            try await SupabaseService.shared.addTagToPaper(userPaperId: paper.id, tagId: tag.id, accessToken: token)
-            paper.tags.append(tag)
+            let serverTags = try await SupabaseService.shared.addTagToPaper(
+                userPaperId: paper.id, tagId: tag.id, accessToken: token
+            )
+            paper.tags = serverTags
             allTags.append(tag)
             newTagName = ""
             onUpdate?(paper)

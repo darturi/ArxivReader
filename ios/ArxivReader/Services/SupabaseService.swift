@@ -62,7 +62,32 @@ class SupabaseService: ObservableObject {
         return (data, httpResponse)
     }
 
-    // MARK: - User Papers (reads go to Supabase, writes go through API)
+    // MARK: - User Papers (reads and writes both go through API for consistency)
+
+    struct PapersAPIResponse: Decodable {
+        let papers: [UserPaperAPI]
+    }
+
+    /// Fetch papers via the Next.js API (service role — no RLS issues with tags).
+    func getUserPapersViaAPI(list: ReadingList, accessToken: String) async throws -> [UserPaper] {
+        let (data, response) = try await apiRequest(
+            path: "/api/papers?list=\(list.rawValue)",
+            accessToken: accessToken
+        )
+
+        guard response.statusCode == 200 else {
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let msg = json["error"] as? String {
+                throw APIError.searchFailed(msg)
+            }
+            throw APIError.serverError(response.statusCode)
+        }
+
+        let result = try JSONDecoder().decode(PapersAPIResponse.self, from: data)
+        return result.papers.map { $0.toUserPaper() }
+    }
+
+    // MARK: - Direct Supabase reads (used as fallback)
 
     func getUserPapers(userId: String, list: ReadingList, limit: Int = 50, offset: Int = 0) async throws -> [UserPaper] {
         // Single query with embedded tags — avoids separate paper_tags query
@@ -303,8 +328,14 @@ class SupabaseService: ObservableObject {
         }
     }
 
-    func addTagToPaper(userPaperId: String, tagId: String, accessToken: String) async throws {
-        let (_, response) = try await apiRequest(
+    struct TagOperationResponse: Decodable {
+        let ok: Bool
+        let tags: [Tag]?
+    }
+
+    /// Add a tag to a paper. Returns the server's current list of tags for this paper.
+    func addTagToPaper(userPaperId: String, tagId: String, accessToken: String) async throws -> [Tag] {
+        let (data, response) = try await apiRequest(
             path: "/api/papers/\(userPaperId)/tags",
             method: "POST",
             body: ["tag_id": tagId],
@@ -314,10 +345,14 @@ class SupabaseService: ObservableObject {
         if response.statusCode != 200 {
             throw APIError.serverError(response.statusCode)
         }
+
+        let result = try JSONDecoder().decode(TagOperationResponse.self, from: data)
+        return result.tags ?? []
     }
 
-    func removeTagFromPaper(userPaperId: String, tagId: String, accessToken: String) async throws {
-        let (_, response) = try await apiRequest(
+    /// Remove a tag from a paper. Returns the server's remaining tags for this paper.
+    func removeTagFromPaper(userPaperId: String, tagId: String, accessToken: String) async throws -> [Tag] {
+        let (data, response) = try await apiRequest(
             path: "/api/papers/\(userPaperId)/tags/\(tagId)",
             method: "DELETE",
             accessToken: accessToken
@@ -326,6 +361,9 @@ class SupabaseService: ObservableObject {
         if response.statusCode != 200 {
             throw APIError.serverError(response.statusCode)
         }
+
+        let result = try JSONDecoder().decode(TagOperationResponse.self, from: data)
+        return result.tags ?? []
     }
 
     // MARK: - Search (via Next.js API)

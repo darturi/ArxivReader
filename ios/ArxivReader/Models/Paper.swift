@@ -177,6 +177,66 @@ struct UserPaper: Identifiable, Hashable {
     }
 }
 
+// MARK: - User Paper from API (flattened with tags)
+
+struct UserPaperAPI: Codable {
+    let id: String
+    let userId: String
+    let arxivId: String
+    let list: ReadingList
+    let addedAt: String
+    let notes: String?
+    let readAt: String?
+    let title: String
+    let authors: AuthorsField
+    let abstract: String
+    let arxivUrl: String
+    let publishedAt: String
+    let tags: [Tag]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case arxivId = "arxiv_id"
+        case list
+        case addedAt = "added_at"
+        case notes
+        case readAt = "read_at"
+        case title, authors, abstract
+        case arxivUrl = "arxiv_url"
+        case publishedAt = "published_at"
+        case tags
+    }
+
+    func toUserPaper() -> UserPaper {
+        UserPaper(
+            id: id, userId: userId, arxivId: arxivId, list: list,
+            addedAt: addedAt, notes: notes, readAt: readAt,
+            title: title, authors: authors.authorsList,
+            abstract: abstract, arxivUrl: arxivUrl,
+            publishedAt: publishedAt, tags: tags
+        )
+    }
+
+    // Reuse the flexible authors decoder
+    var authorsList: [String] { authors.authorsList }
+}
+
+// Extension to give AuthorsField a helper
+extension AuthorsField {
+    var authorsList: [String] {
+        switch self {
+        case .array(let arr): return arr
+        case .string(let str):
+            if let data = str.data(using: .utf8),
+               let arr = try? JSONDecoder().decode([String].self, from: data) {
+                return arr
+            }
+            return [str]
+        }
+    }
+}
+
 // MARK: - Search Result (from API)
 
 struct SearchResultPaper: Codable, Identifiable {

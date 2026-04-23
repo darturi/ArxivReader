@@ -38,7 +38,25 @@ export async function DELETE(
     }
 
     await removeTagFromPaper(supabase, id, tagId);
-    return NextResponse.json({ ok: true });
+
+    // Return remaining tags for this paper
+    const { data: paperTags } = await supabase
+      .from("paper_tags")
+      .select(`
+        tags (
+          id,
+          user_id,
+          name,
+          created_at
+        )
+      `)
+      .eq("user_paper_id", id);
+
+    const tags = (paperTags || [])
+      .map((pt: Record<string, unknown>) => pt.tags)
+      .filter(Boolean);
+
+    return NextResponse.json({ ok: true, tags });
   } catch (error) {
     console.error("Remove tag error:", error);
     return NextResponse.json(

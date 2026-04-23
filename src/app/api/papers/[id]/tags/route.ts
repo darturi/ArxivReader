@@ -46,7 +46,25 @@ export async function POST(
     }
 
     await addTagToPaper(supabase, id, body.tag_id);
-    return NextResponse.json({ ok: true });
+
+    // Return all current tags for this paper so the client has the truth
+    const { data: paperTags } = await supabase
+      .from("paper_tags")
+      .select(`
+        tags (
+          id,
+          user_id,
+          name,
+          created_at
+        )
+      `)
+      .eq("user_paper_id", id);
+
+    const tags = (paperTags || [])
+      .map((pt: Record<string, unknown>) => pt.tags)
+      .filter(Boolean);
+
+    return NextResponse.json({ ok: true, tags });
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error);
     console.error("Add tag error:", msg, error);
