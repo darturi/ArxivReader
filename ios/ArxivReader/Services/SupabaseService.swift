@@ -76,6 +76,11 @@ class SupabaseService: ObservableObject {
             accessToken: accessToken
         )
 
+        // DEBUG: log raw API response
+        let rawJSON = String(data: data, encoding: .utf8) ?? "(not UTF-8)"
+        print("DEBUG getUserPapersViaAPI status=\(response.statusCode) bytes=\(data.count)")
+        print("DEBUG getUserPapersViaAPI raw=\(rawJSON.prefix(500))")
+
         guard response.statusCode == 200 else {
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let msg = json["error"] as? String {
@@ -84,8 +89,20 @@ class SupabaseService: ObservableObject {
             throw APIError.serverError(response.statusCode)
         }
 
-        let result = try JSONDecoder().decode(PapersAPIResponse.self, from: data)
-        return result.papers.map { $0.toUserPaper() }
+        do {
+            let result = try JSONDecoder().decode(PapersAPIResponse.self, from: data)
+            let papers = result.papers.map { $0.toUserPaper() }
+            // DEBUG: log tag counts
+            for p in papers {
+                if !p.tags.isEmpty {
+                    print("DEBUG paper '\(p.title.prefix(30))' has \(p.tags.count) tags: \(p.tags.map { $0.name })")
+                }
+            }
+            return papers
+        } catch {
+            print("DEBUG decode error: \(error)")
+            throw error
+        }
     }
 
     // MARK: - Direct Supabase reads (used as fallback)
@@ -343,12 +360,23 @@ class SupabaseService: ObservableObject {
             accessToken: accessToken
         )
 
+        // DEBUG: log raw response
+        let rawJSON = String(data: data, encoding: .utf8) ?? "(not UTF-8)"
+        print("DEBUG addTagToPaper status=\(response.statusCode) raw=\(rawJSON)")
+
         if response.statusCode != 200 {
             throw APIError.serverError(response.statusCode)
         }
 
-        let result = try JSONDecoder().decode(TagOperationResponse.self, from: data)
-        return result.tags ?? []
+        do {
+            let result = try JSONDecoder().decode(TagOperationResponse.self, from: data)
+            let tags = result.tags ?? []
+            print("DEBUG addTagToPaper decoded \(tags.count) tags: \(tags.map { $0.name })")
+            return tags
+        } catch {
+            print("DEBUG addTagToPaper decode error: \(error)")
+            throw error
+        }
     }
 
     /// Remove a tag from a paper. Returns the server's remaining tags for this paper.

@@ -89,8 +89,10 @@ class AuthService: ObservableObject {
     func getAccessToken() async -> String? {
         do {
             let session = try await supabase.auth.session
+            print("DEBUG TOKEN: \(session.accessToken)")
             return session.accessToken
         } catch {
+            print("DEBUG TOKEN ERROR: \(error)")
             return nil
         }
     }

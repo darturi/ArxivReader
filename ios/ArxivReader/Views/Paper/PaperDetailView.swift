@@ -90,9 +90,9 @@ struct PaperDetailView: View {
                         if !paper.tags.isEmpty {
                             FlowLayout(spacing: 6) {
                                 ForEach(paper.tags) { tag in
-                                    TagPill(tag: tag) {
+                                    TagPill(tag: tag, onRemove: {
                                         Task { await removeTag(tag) }
-                                    }
+                                    })
                                 }
                             }
                         }

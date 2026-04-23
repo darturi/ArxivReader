@@ -169,11 +169,17 @@ struct UserPaper: Identifiable, Hashable {
     var tags: [Tag]
 
     static func == (lhs: UserPaper, rhs: UserPaper) -> Bool {
-        lhs.id == rhs.id
+        lhs.id == rhs.id &&
+        lhs.list == rhs.list &&
+        lhs.notes == rhs.notes &&
+        lhs.readAt == rhs.readAt &&
+        lhs.tags == rhs.tags
     }
 
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
+        hasher.combine(list)
+        hasher.combine(tags)
     }
 }
 
