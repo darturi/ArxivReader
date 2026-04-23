@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTags } from "@/lib/hooks";
+import TagPill from "./TagPill";
 
 export default function TagManager() {
   const { tags, loading, refetch } = useTags();
@@ -77,7 +78,7 @@ export default function TagManager() {
               key={tag.id}
               className="flex items-center justify-between p-3 rounded-lg hover:bg-stone-50"
             >
-              <span className="text-sm text-stone-700">{tag.name}</span>
+              <TagPill name={tag.name} size="md" />
               <button
                 onClick={() => handleDelete(tag.id)}
                 onBlur={() => setDeleting(null)}
