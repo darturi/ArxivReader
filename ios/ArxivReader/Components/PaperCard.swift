@@ -79,15 +79,22 @@ struct HighlightedText: View {
         if highlight.isEmpty {
             Text(text)
         } else {
-            let parts = splitWithHighlight(text: text, highlight: highlight)
-            parts.reduce(Text("")) { result, part in
-                if part.isMatch {
-                    result + Text(part.text).bold().foregroundColor(.orange)
-                } else {
-                    result + Text(part.text)
-                }
-            }
+            Text(buildAttributedString())
         }
+    }
+
+    private func buildAttributedString() -> AttributedString {
+        let parts = splitWithHighlight(text: text, highlight: highlight)
+        var result = AttributedString()
+        for part in parts {
+            var segment = AttributedString(part.text)
+            if part.isMatch {
+                segment.font = .body.bold()
+                segment.foregroundColor = .orange
+            }
+            result.append(segment)
+        }
+        return result
     }
 
     private struct TextPart {

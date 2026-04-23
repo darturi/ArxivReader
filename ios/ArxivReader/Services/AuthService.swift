@@ -87,7 +87,12 @@ class AuthService: ObservableObject {
     }
 
     func getAccessToken() async -> String? {
-        try? await supabase.auth.session.accessToken
+        do {
+            let session = try await supabase.auth.session
+            return session.accessToken
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Private
@@ -110,11 +115,10 @@ class ASWebAuthContextProvider: NSObject, ASWebAuthenticationPresentationContext
     static let shared = ASWebAuthContextProvider()
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else {
-            return ASPresentationAnchor()
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+            return ASPresentationAnchor(frame: .zero)
         }
-        return window
+        return windowScene.windows.first ?? ASPresentationAnchor(windowScene: windowScene)
     }
 }
 

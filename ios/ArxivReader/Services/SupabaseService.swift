@@ -13,7 +13,8 @@ class SupabaseService: ObservableObject {
             supabaseKey: Config.supabaseAnonKey,
             options: .init(
                 auth: .init(
-                    redirectToURL: URL(string: "arxivreader://auth/callback")
+                    redirectToURL: URL(string: "arxivreader://auth/callback"),
+                    emitLocalSessionAsInitialSession: true
                 )
             )
         )

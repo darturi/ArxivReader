@@ -143,10 +143,10 @@ struct PaperDetailView: View {
                                 TextField("YYYY-MM-DD", text: $readDateString)
                                     .textFieldStyle(.roundedBorder)
                                     .font(.subheadline)
-                                    .onChange(of: readDateString) { _, newValue in
+                                    .onChange(of: readDateString) {
                                         // Only save if it looks like a valid date or is empty
-                                        if newValue.isEmpty || isValidDate(newValue) {
-                                            Task { await saveReadDate(newValue.isEmpty ? nil : newValue) }
+                                        if readDateString.isEmpty || isValidDate(readDateString) {
+                                            Task { await saveReadDate(readDateString.isEmpty ? nil : readDateString) }
                                         }
                                     }
 
@@ -199,7 +199,7 @@ struct PaperDetailView: View {
                             .padding(8)
                             .background(Color(.systemGray6))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .onChange(of: notes) { _, _ in
+                            .onChange(of: notes) {
                                 debounceSaveNotes()
                             }
                     }
@@ -254,8 +254,8 @@ struct PaperDetailView: View {
                 readDateString = paper.readAt ?? ""
                 await loadTags()
             }
-            .onChange(of: pendingTagToAdd) { _, tag in
-                guard let tag else { return }
+            .onChange(of: pendingTagToAdd) {
+                guard let tag = pendingTagToAdd else { return }
                 pendingTagToAdd = nil
                 Task { await addTag(tag) }
             }
