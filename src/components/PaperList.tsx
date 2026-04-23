@@ -59,7 +59,8 @@ export default function PaperList({
       // Optimistic update — sync the selected paper and the list immediately
       setSelectedPaper(updatedPaper);
     }
-    refetch();
+    // Background refresh: don't set loading=true so the list doesn't flash
+    refetch(true);
   };
 
   if (loading) {

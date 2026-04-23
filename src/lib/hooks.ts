@@ -14,8 +14,8 @@ export function usePapers(list: "read" | "to_read") {
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
 
-  const fetchPapers = useCallback(async () => {
-    setLoading(true);
+  const fetchPapers = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/papers?list=${list}&limit=${PAGE_SIZE}&offset=0`);
