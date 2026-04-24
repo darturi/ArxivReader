@@ -1,21 +1,60 @@
-# ArxivReader
+# ArXiv Reader
 
 A personal research library for saving, organizing, and annotating papers from arXiv. Available as a web app (Next.js) and a native iOS app (SwiftUI), both backed by Supabase.
 
-**Elevator pitch:** ArxivReader lets you search arXiv, save papers to "Read" and "To Read" lists, tag them with color-coded labels, take notes, and track what you've read — all synced across web and mobile through a shared backend.
+Search arXiv, save papers to "Read" and "To Read" lists, tag them with color-coded labels, take notes, and track what you've read — all synced across web and mobile through a shared backend.
+
+<p align="center">
+  <img src="docs/screenshots/read-list.png" alt="Reading list with tag filters" width="720" />
+</p>
 
 ---
 
 ## Features
 
-- **Search arXiv** — full-text keyword search, arXiv ID lookup (e.g. `2301.12345`), and DOI detection, all powered by the arXiv API
-- **Reading lists** — organize papers into "Read" and "To Read" lists; move papers between them freely
-- **Tags** — create user-owned tags with automatic color assignment (deterministic 12-color palette); filter paper lists by tag
-- **Notes** — add freeform notes to any paper, with debounced auto-save
-- **Read date tracking** — record when you finished reading a paper
-- **Author pages** — tap any author name to see their other papers on arXiv
-- **Paper cache** — shared across all users so repeated lookups don't hit the arXiv API
-- **Rate limiting & quotas** — per-user limits to keep things sustainable (20 searches/hr, max 500 papers, max 100 tags)
+### Search arXiv
+
+Full-text keyword search, arXiv ID lookup (e.g. `2301.12345`), and DOI detection, all powered by the arXiv API. Results show the abstract inline so you can decide at a glance whether a paper is worth saving. Rate-limited to 20 searches per hour per user.
+
+<p align="center">
+  <img src="docs/screenshots/search.png" alt="Searching for papers on arXiv" width="720" />
+</p>
+
+### Reading lists
+
+Organize papers into "Read" and "To Read" lists. Move papers between them freely, and optionally record the date you finished reading.
+
+### Tags
+
+Create user-owned tags with automatic color assignment (deterministic 12-color palette). Filter your reading list by one or more tags to surface related work quickly.
+
+### Author pages
+
+Click any author name to see their other publications on arXiv. Add papers to your lists directly from the author view, with an optional date picker for logging when you read them.
+
+<p align="center">
+  <img src="docs/screenshots/author-detail.png" alt="Author detail page" width="720" />
+</p>
+
+### Notes
+
+Add freeform notes to any paper, with debounced auto-save.
+
+### Paper cache & rate limiting
+
+A shared paper cache avoids redundant arXiv API calls across users. Per-user quotas keep things sustainable (20 searches/hr, max 500 papers, max 100 tags).
+
+### Responsive & mobile-native
+
+The web interface adapts to mobile with a bottom tab bar, and a native iOS app (SwiftUI) provides a first-class mobile experience — both talk to the same backend.
+
+<p align="center">
+  <img src="docs/screenshots/mobile-read.png" alt="Mobile reading list" width="280" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/mobile-search.png" alt="Mobile search" width="280" />
+</p>
+
+---
 
 ## Tech Stack
 
@@ -61,6 +100,8 @@ arxiv-reader/
 └── package.json
 ```
 
+---
+
 ## Getting Started
 
 ### Prerequisites
@@ -81,7 +122,7 @@ supabase/migrations/003_security_hardening.sql
 
 These create the `users`, `paper_cache`, `user_papers`, `tags`, `paper_tags`, and `rate_limit_log` tables, along with Row Level Security policies, triggers, and quota constraints.
 
-Enable **OAuth** (e.g. Google or GitHub) in your Supabase project's Auth settings.
+Enable **Google OAuth** (or another provider) in your Supabase project's Auth settings.
 
 ### 2. Web App
 
@@ -112,7 +153,7 @@ Open [http://localhost:3000](http://localhost:3000) to use the app.
 
 The iOS app lives in the `ios/` directory and uses Swift Package Manager for dependencies.
 
-1. Open `ios/` in Xcode (File → Open → select the `ios` folder or `Package.swift`).
+1. Open `ios/` in Xcode (File > Open > select the `ios` folder or `Package.swift`).
 2. Copy `Secrets.plist.example` to `Secrets.plist` and fill in your values:
 
 ```xml
@@ -129,11 +170,13 @@ The iOS app lives in the `ios/` directory and uses Swift Package Manager for dep
 3. `Secrets.plist` is gitignored — never commit it.
 4. Build and run on a simulator or device (iOS 17+).
 
-The iOS app authenticates via Supabase OAuth and then calls the same Next.js API routes as the web app (using `Authorization: Bearer <token>` headers), so the web app must be deployed before the iOS app can function.
+The iOS app authenticates via Supabase OAuth and calls the same Next.js API routes as the web app (using `Authorization: Bearer <token>` headers), so the web app must be deployed before the iOS app can function.
 
-## API Routes
+---
 
-All write operations are routed through the Next.js API (which uses the Supabase service role key) to enforce rate limiting and quotas server-side.
+## API
+
+All write operations are routed through the Next.js API (which uses the Supabase service role key) to enforce rate limiting and quotas server-side. See [API.md](API.md) for the full reference.
 
 | Method | Route | Description |
 |--------|-------|-------------|
